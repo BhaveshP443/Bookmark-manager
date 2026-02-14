@@ -18,8 +18,7 @@ export async function createClient() {
               cookieStore.set(name, value, options);
             });
           } catch {
-            // In Server Components, setting cookies is not allowed
-            // This prevents crashing
+            // Prevent crash in Server Components
           }
         },
       },
