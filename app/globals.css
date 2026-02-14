@@ -86,21 +86,4 @@ body {
 .animation-delay-2000 {
   animation-delay: 2s;
 }
-@keyframes floatDot {
-  0% {
-    transform: translateY(0px);
-    opacity: 0.4;
-  }
-  50% {
-    transform: translateY(-20px);
-    opacity: 0.8;
-  }
-  100% {
-    transform: translateY(0px);
-    opacity: 0.4;
-  }
-}
 
-.animate-floatDot {
-  animation: floatDot 6s infinite ease-in-out;
-}

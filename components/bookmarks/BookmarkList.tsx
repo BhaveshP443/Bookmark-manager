@@ -3,7 +3,7 @@ import BookmarkItem from "./BookmarkItem";
 
 type Props = {
   bookmarks: Bookmark[];
-  onDelete: (bookmark: Bookmark) => void;
+  onDelete: (bookmark: Bookmark) => Promise<void>;
 };
 
 export default function BookmarkList({
