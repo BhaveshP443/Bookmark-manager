@@ -10,10 +10,10 @@ Users authenticate via Google OAuth and manage private bookmarks with real-time 
 ## 🚀 Live Demo
 
 Vercel URL:  
-https://your-vercel-domain.vercel.app
+https://smartbookmark-manager.vercel.app/
 
 GitHub Repository:  
-https://github.com/your-username/your-repo
+https://github.com/BhaveshP443/Bookmark-manager
 
 ---
 
