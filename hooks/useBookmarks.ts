@@ -8,6 +8,7 @@ export function useBookmarks(userId: string) {
   const supabase = useMemo(() => createClient(), []);
 
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -24,8 +25,10 @@ export function useBookmarks(userId: string) {
       if (data) setBookmarks(data);
     };
 
+    // Initial fetch
     fetchBookmarks();
 
+    // Realtime subscription
     channel = supabase
       .channel(`bookmarks-${userId}`)
       .on(
@@ -37,6 +40,8 @@ export function useBookmarks(userId: string) {
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
+          console.log("Realtime event:", payload);
+
           if (payload.eventType === "INSERT") {
             setBookmarks((prev) => [
               payload.new as Bookmark,
@@ -54,8 +59,14 @@ export function useBookmarks(userId: string) {
         }
       )
       .subscribe((status) => {
+        console.log("Realtime status:", status);
+
         if (status === "SUBSCRIBED") {
-          console.log("Realtime connected");
+          setIsSubscribed(true);
+        }
+
+        if (status === "CLOSED" || status === "TIMED_OUT") {
+          setIsSubscribed(false);
         }
       });
 
@@ -77,6 +88,16 @@ export function useBookmarks(userId: string) {
         user_id: userId,
       },
     ]);
+
+    // 🔥 Fallback safety fetch
+    // Guarantees UI consistency even if realtime misses event
+    const { data } = await supabase
+      .from("bookmarks")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (data) setBookmarks(data);
   };
 
   const deleteBookmark = async (
@@ -85,5 +106,5 @@ export function useBookmarks(userId: string) {
     await supabase.from("bookmarks").delete().eq("id", id);
   };
 
-  return { bookmarks, addBookmark, deleteBookmark };
+  return { bookmarks, addBookmark, deleteBookmark, isSubscribed };
 }
