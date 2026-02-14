@@ -82,10 +82,10 @@ export default function BookmarkPage({ user }: Props) {
     <div className="relative min-h-screen bg-black text-white overflow-hidden">
 
       {/* Subtle Grid */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(to_right,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(to_right,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-size-[40px_40px]"></div>
 
       {/* Aurora Glow */}
-      <div className="absolute inset-0 bg-gradient-to-br from-purple-700/20 via-transparent to-blue-700/20"></div>
+      <div className="absolute inset-0 bg-linear-to-br from-purple-700/20 via-transparent to-blue-700/20"></div>
 
       {/* Content Layer */}
       <div className="relative z-10 p-8">

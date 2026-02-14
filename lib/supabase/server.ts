@@ -12,7 +12,16 @@ export async function createClient() {
         getAll() {
           return cookieStore.getAll();
         },
-        // ❌ DO NOT allow setting cookies here
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options);
+            });
+          } catch {
+            // In Server Components, setting cookies is not allowed
+            // This prevents crashing
+          }
+        },
       },
     }
   );
