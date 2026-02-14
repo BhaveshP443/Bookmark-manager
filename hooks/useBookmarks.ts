@@ -77,28 +77,27 @@ export function useBookmarks(userId: string) {
     };
   }, [userId, supabase]);
 
-  const addBookmark = async (
-    title: string,
-    url: string
-  ): Promise<void> => {
-    await supabase.from("bookmarks").insert([
+ const addBookmark = async (
+  title: string,
+  url: string
+): Promise<void> => {
+  const { data } = await supabase
+    .from("bookmarks")
+    .insert([
       {
         title,
         url,
         user_id: userId,
       },
-    ]);
+    ])
+    .select()
+    .single();
 
-    // 🔥 Fallback safety fetch
-    // Guarantees UI consistency even if realtime misses event
-    const { data } = await supabase
-      .from("bookmarks")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false });
+  if (data) {
+    setBookmarks((prev) => [data as Bookmark, ...prev]);
+  }
+};
 
-    if (data) setBookmarks(data);
-  };
 
   const deleteBookmark = async (
     id: string
