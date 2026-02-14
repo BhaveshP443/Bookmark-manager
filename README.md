@@ -1,7 +1,7 @@
-````md
+Author: Bhavesh Patidar
 # 📌 Bookmark Manager (Google OAuth + Realtime)
 
-A production-ready bookmark manager built with **Next.js App Router** and **Supabase (Auth, Database, Realtime)**.
+A production-ready bookmark manager built with Next.js App Router and Supabase (Auth, Database, Realtime).
 
 Users authenticate via Google OAuth and manage private bookmarks with real-time updates across multiple tabs — without page refresh.
 
@@ -9,23 +9,23 @@ Users authenticate via Google OAuth and manage private bookmarks with real-time 
 
 ## 🚀 Live Demo
 
-**Vercel URL:**  
+Vercel URL:  
 https://your-vercel-domain.vercel.app
 
-**GitHub Repository:**  
+GitHub Repository:  
 https://github.com/your-username/your-repo
 
 ---
 
 ## 🛠 Tech Stack
 
-- **Next.js (App Router, Server Components)**
-- **Supabase**
+- Next.js (App Router, Server Components)
+- Supabase
   - Authentication (Google OAuth)
   - PostgreSQL Database
   - Realtime subscriptions
-- **Tailwind CSS**
-- **Vercel (Deployment)**
+- Tailwind CSS
+- Vercel (Deployment)
 
 ---
 
@@ -116,17 +116,17 @@ Without this configuration, realtime events may fail in production.
 
 ### 1️⃣ OAuth Redirect Loop in Production
 
-**Problem:** After successful login, the app redirected back to login page.
-**Cause:** Session cookies were not being persisted correctly in Next.js App Router.
-**Solution:** Properly configured `createServerClient` using `await cookies()` and safe `setAll` cookie handling in Route Handlers.
+Problem: After successful login, the app redirected back to login page.
+Cause: Session cookies were not being persisted correctly in Next.js App Router.
+Solution: Properly configured `createServerClient` using `await cookies()` and safe `setAll` cookie handling in Route Handlers.
 
 ---
 
 ### 2️⃣ Realtime Not Working in Production
 
-**Problem:** Insert/Delete worked locally but not on deployed version.
-**Cause:** PostgreSQL replica identity was not set to FULL.
-**Solution:**
+Problem: Insert/Delete worked locally but not on deployed version.
+Cause: PostgreSQL replica identity was not set to FULL.
+Solution:
 
 ```sql
 ALTER TABLE bookmarks REPLICA IDENTITY FULL;
@@ -136,9 +136,9 @@ ALTER TABLE bookmarks REPLICA IDENTITY FULL;
 
 ### 3️⃣ Supabase Redirecting to localhost After Deployment
 
-**Problem:** Production login redirected to `localhost:3000`.
-**Cause:** Supabase Site URL was incorrectly set to localhost.
-**Solution:**
+Problem: Production login redirected to `localhost:3000`.
+Cause: Supabase Site URL was incorrectly set to localhost.
+Solution:
 
 * Updated Supabase Site URL to Vercel domain
 * Added both local and production callback URLs
@@ -148,8 +148,8 @@ ALTER TABLE bookmarks REPLICA IDENTITY FULL;
 
 ### 4️⃣ WebSocket TIMED_OUT in Development
 
-**Cause:** React Strict Mode and Fast Refresh triggered multiple effect executions.
-**Solution:** Stabilized Supabase client using `useMemo` and ensured proper channel cleanup inside `useEffect` return.
+Cause: React Strict Mode and Fast Refresh triggered multiple effect executions.
+Solution: Stabilized Supabase client using `useMemo` and ensured proper channel cleanup inside `useEffect` return.
 
 ---
 
@@ -204,6 +204,6 @@ This project demonstrates:
 * Proper RLS implementation
 * Production debugging and deployment management
 
-The final implementation satisfies all assignment requirements while following scalable architectural practices.
+
 
 
