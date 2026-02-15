@@ -116,42 +116,96 @@ Without this configuration, realtime events may fail in production.
 
 ### 1️⃣ OAuth Redirect Loop in Production
 
-Problem: After successful login, the app redirected back to login page.
-Cause: Session cookies were not being persisted correctly in Next.js App Router.
-Solution: Properly configured `createServerClient` using `await cookies()` and safe `setAll` cookie handling in Route Handlers.
+Problem:
+After successful Google login, the app redirected back to the login page instead of `/dashboard`.
+
+Cause:
+Session cookies were not being persisted correctly when using Next.js App Router with Server Components. The Supabase session exchange completed, but cookies were not stored properly for subsequent requests.
+
+Solution:
+
+* Properly configured `createServerClient` using `await cookies()`
+* Implemented correct `setAll` cookie handling inside Route Handlers
+* Ensured session exchange (`exchangeCodeForSession`) completes before redirect
+* Protected `/dashboard` using server-side session validation
 
 ---
 
-### 2️⃣ Realtime Not Working in Production
+### 2️⃣ Realtime Insert Events Inconsistent Across Devices
 
-Problem: Insert/Delete worked locally but not on deployed version.
-Cause: PostgreSQL replica identity was not set to FULL.
+Problem:
+Delete events worked across devices, but insert events were delayed, inconsistent, or only appeared after another database action.
+
+Cause:
+Directly mutating local state using `payload.new` from realtime events caused race conditions and inconsistent synchronization across multiple browser instances.
+
 Solution:
+
+* Switched to a production-stable strategy: on any realtime event → refetch fresh data from database
+* Avoided relying solely on realtime payload mutation
+* Ensured `bookmarks` table was included in `supabase_realtime` publication
+* Enabled:
 
 ```sql
 ALTER TABLE bookmarks REPLICA IDENTITY FULL;
 ```
 
+This ensured reliable INSERT and DELETE propagation in production.
+
 ---
 
 ### 3️⃣ Supabase Redirecting to localhost After Deployment
 
-Problem: Production login redirected to `localhost:3000`.
-Cause: Supabase Site URL was incorrectly set to localhost.
+Problem:
+Production login redirected users to `http://localhost:3000` instead of the deployed Vercel domain.
+
+Cause:
+Supabase Site URL and OAuth redirect URLs were still configured for localhost.
+
 Solution:
 
-* Updated Supabase Site URL to Vercel domain
-* Added both local and production callback URLs
-* Updated Google OAuth authorized origins
+* Updated Supabase Site URL to the Vercel production domain
+* Added both local and production callback URLs in Supabase Auth settings
+* Updated Google OAuth Authorized JavaScript Origins and Redirect URIs
 
 ---
 
 ### 4️⃣ WebSocket TIMED_OUT in Development
 
-Cause: React Strict Mode and Fast Refresh triggered multiple effect executions.
-Solution: Stabilized Supabase client using `useMemo` and ensured proper channel cleanup inside `useEffect` return.
+Problem:
+Realtime subscriptions randomly closed with `TIMED_OUT` during development.
+
+Cause:
+React Strict Mode and Fast Refresh triggered multiple `useEffect` executions, causing duplicate realtime subscriptions and premature channel closure.
+
+Solution:
+
+* Stabilized Supabase client using `useMemo`
+* Ensured proper channel cleanup in `useEffect` return
+* Verified single active subscription per user
 
 ---
+
+### 5️⃣ PKCE Code Verifier & Invalid Refresh Token Errors
+
+Problem:
+Occasional authentication errors such as:
+
+* `Invalid Refresh Token: Refresh Token Not Found`
+* `PKCE code verifier not found in storage`
+
+Cause:
+Improper cookie persistence during OAuth flow and token refresh attempts in Server Components before session exchange was finalized.
+
+Solution:
+
+* Ensured `createServerClient` handled cookies correctly with `await cookies()`
+* Restricted session exchange logic to Route Handlers
+* Avoided calling `getSession()` before session exchange completed
+* Cleared stale cookies during local testing
+
+---
+
 
 ## 📦 Local Development Setup
 
