@@ -6,9 +6,7 @@ import { Bookmark } from "@/types/database";
 
 export function useBookmarks(userId: string) {
   const supabase = useMemo(() => createClient(), []);
-
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
-  const [isSubscribed, setIsSubscribed] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -23,7 +21,7 @@ export function useBookmarks(userId: string) {
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error("Initial fetch error:", error);
+        console.error("Fetch error:", error);
         return;
       }
 
@@ -32,8 +30,10 @@ export function useBookmarks(userId: string) {
       }
     };
 
+    // Initial fetch
     fetchBookmarks();
 
+    // Realtime subscription
     channel = supabase
       .channel(`bookmarks-${userId}`)
       .on(
@@ -45,30 +45,29 @@ export function useBookmarks(userId: string) {
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          const newRow = payload.new as Bookmark | undefined;
-          const oldRow = payload.old as Bookmark | undefined;
-
           console.log("Realtime event:", payload.eventType);
-          console.log("Payload user_id:", newRow?.user_id);
-          console.log("Current userId:", userId);
 
-          if (payload.eventType === "INSERT" && newRow) {
-            setBookmarks((prev) => {
-              if (prev.some((b) => b.id === newRow.id)) return prev;
-              return [newRow, ...prev];
-            });
+          if (payload.eventType === "INSERT") {
+            setBookmarks((prev) => [
+              payload.new as Bookmark,
+              ...prev,
+            ]);
           }
 
-          if (payload.eventType === "DELETE" && oldRow) {
+          if (payload.eventType === "DELETE") {
             setBookmarks((prev) =>
-              prev.filter((b) => b.id !== oldRow.id)
+              prev.filter(
+                (b) => b.id !== (payload.old as Bookmark).id
+              )
             );
           }
 
-          if (payload.eventType === "UPDATE" && newRow) {
+          if (payload.eventType === "UPDATE") {
             setBookmarks((prev) =>
               prev.map((b) =>
-                b.id === newRow.id ? newRow : b
+                b.id === (payload.new as Bookmark).id
+                  ? (payload.new as Bookmark)
+                  : b
               )
             );
           }
@@ -76,10 +75,6 @@ export function useBookmarks(userId: string) {
       )
       .subscribe((status) => {
         console.log("Realtime status:", status);
-
-        if (status === "SUBSCRIBED") setIsSubscribed(true);
-        if (status === "CLOSED" || status === "TIMED_OUT")
-          setIsSubscribed(false);
       });
 
     return () => {
@@ -89,23 +84,27 @@ export function useBookmarks(userId: string) {
     };
   }, [userId, supabase]);
 
+  // 🔹 Insert (NO manual state update)
   const addBookmark = async (
     title: string,
     url: string
   ): Promise<void> => {
-    const { error } = await supabase.from("bookmarks").insert([
-      {
-        title,
-        url,
-        user_id: userId,
-      },
-    ]);
+    const { error } = await supabase
+      .from("bookmarks")
+      .insert([
+        {
+          title,
+          url,
+          user_id: userId,
+        },
+      ]);
 
     if (error) {
       console.error("Insert error:", error);
     }
   };
 
+  // 🔹 Delete (NO manual state update)
   const deleteBookmark = async (
     id: string
   ): Promise<void> => {
@@ -123,6 +122,5 @@ export function useBookmarks(userId: string) {
     bookmarks,
     addBookmark,
     deleteBookmark,
-    isSubscribed,
   };
 }
