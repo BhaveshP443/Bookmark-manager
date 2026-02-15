@@ -1,38 +1,39 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Bookmark } from "@/types/database";
 
 export function useBookmarks(userId: string) {
   const supabase = useMemo(() => createClient(), []);
-
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
-  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  /**
+   * Fetch all bookmarks (single source of truth)
+   */
+  const fetchBookmarks = useCallback(async () => {
+    if (!userId) return;
+
+    const { data } = await supabase
+      .from("bookmarks")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (data) {
+      setBookmarks(data);
+    }
+
+    setIsLoading(false);
+  }, [supabase, userId]);
 
   useEffect(() => {
     if (!userId) return;
 
-    let channel: ReturnType<typeof supabase.channel>;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
-    const fetchBookmarks = async () => {
-      const { data, error } = await supabase
-        .from("bookmarks")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Fetch error:", error);
-        return;
-      }
-
-      if (data) {
-        setBookmarks(data);
-      }
-    };
-
-    // Initial fetch
+    // Initial load
     fetchBookmarks();
 
     // Realtime subscription
@@ -46,21 +47,13 @@ export function useBookmarks(userId: string) {
           table: "bookmarks",
           filter: `user_id=eq.${userId}`,
         },
-        () => {
-          // 🔥 Always refetch for consistency
-          fetchBookmarks();
+        async () => {
+          // Always refetch to guarantee consistency
+          await fetchBookmarks();
         }
       )
       .subscribe((status) => {
         console.log("Realtime status:", status);
-
-        if (status === "SUBSCRIBED") {
-          setIsSubscribed(true);
-        }
-
-        if (status === "CLOSED" || status === "TIMED_OUT") {
-          setIsSubscribed(false);
-        }
       });
 
     return () => {
@@ -68,55 +61,39 @@ export function useBookmarks(userId: string) {
         supabase.removeChannel(channel);
       }
     };
-  }, [userId, supabase]);
+  }, [userId, supabase, fetchBookmarks]);
 
-  // 🔥 Optimistic insert (instant UI)
+  /**
+   * Add bookmark
+   */
   const addBookmark = async (
     title: string,
     url: string
   ): Promise<void> => {
-    const { data, error } = await supabase
-      .from("bookmarks")
-      .insert([
-        {
-          title,
-          url,
-          user_id: userId,
-        },
-      ])
-      .select()
-      .single();
+    await supabase.from("bookmarks").insert({
+      title,
+      url,
+      user_id: userId,
+    });
 
-    if (error) {
-      console.error("Insert error:", error);
-      return;
-    }
-
-    if (data) {
-      setBookmarks((prev) => {
-        // Prevent duplicates
-        if (prev.find((b) => b.id === data.id)) return prev;
-        return [data as Bookmark, ...prev];
-      });
-    }
+    // Ensure UI consistency even if realtime lags
+    await fetchBookmarks();
   };
 
-  // Delete handled fully by realtime refetch
+  /**
+   * Delete bookmark
+   */
   const deleteBookmark = async (id: string): Promise<void> => {
-    const { error } = await supabase
-      .from("bookmarks")
-      .delete()
-      .eq("id", id);
+    await supabase.from("bookmarks").delete().eq("id", id);
 
-    if (error) {
-      console.error("Delete error:", error);
-    }
+    // Ensure UI consistency
+    await fetchBookmarks();
   };
 
   return {
     bookmarks,
     addBookmark,
     deleteBookmark,
-    isSubscribed,
+    isLoading,
   };
 }
