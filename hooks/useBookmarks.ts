@@ -40,7 +40,9 @@ export function useBookmarks(userId: string) {
           event: "INSERT",
           schema: "public",
           table: "bookmarks",
-          filter: `user_id=eq.${userId}`,
+          // filter: `user_id=eq.${userId}`,
+          filter: undefined,
+
         },
         (payload) => {
           const newBookmark = payload.new as Bookmark;
@@ -54,22 +56,38 @@ export function useBookmarks(userId: string) {
           });
         }
       )
-      .on(
-        "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "bookmarks",
-          filter: `user_id=eq.${userId}`,
-        },
-        (payload) => {
-          const deletedId = (payload.old as Bookmark).id;
+     .on(
+  "postgres_changes",
+  {
+    event: "*",
+    schema: "public",
+    table: "bookmarks",
+    filter: `user_id=eq.${userId}`,
+  },
+  (payload) => {
+    console.log("Realtime event:", payload.eventType);
 
-          setBookmarks((prev) =>
-            prev.filter((b) => b.id !== deletedId)
-          );
-        }
-      )
+    console.log("Payload user_id:", payload.new?.user_id);
+    console.log("Payload old user_id:", payload.old?.user_id);
+    console.log("Current userId:", userId);
+
+    if (payload.eventType === "INSERT") {
+      setBookmarks((prev) => [
+        payload.new as Bookmark,
+        ...prev,
+      ]);
+    }
+
+    if (payload.eventType === "DELETE") {
+      setBookmarks((prev) =>
+        prev.filter(
+          (b) => b.id !== (payload.old as Bookmark).id
+        )
+      );
+    }
+  }
+)
+
       .subscribe((status) => {
         console.log("Realtime status:", status);
       });
