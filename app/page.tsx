@@ -6,16 +6,17 @@ export default function Home() {
   const supabase = createClient();
 
   const handleLogin = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
-        queryParams: {
-          prompt: "select_account",
-        },
+  await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${location.origin}/auth/callback`,
+      queryParams: {
+        prompt: "select_account",
       },
-    });
-  };
+    },
+  });
+};
+
 
   return (
     <div className="relative min-h-screen bg-black text-white overflow-hidden flex items-center justify-center">

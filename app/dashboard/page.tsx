@@ -5,16 +5,9 @@ import BookmarkPage from "@/components/bookmarks/BookmarkPage";
 export default async function Dashboard() {
   const supabase = await createClient();
 
-const {
-  data: { session },
-} = await supabase.auth.getSession();
-
-if (!session) {
-  redirect("/");
-}
-
-const user = session.user;
-
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     redirect("/");

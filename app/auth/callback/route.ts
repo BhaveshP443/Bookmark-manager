@@ -18,6 +18,5 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  // Important: return response AFTER session is set
   return NextResponse.redirect(new URL("/dashboard", request.url));
 }
