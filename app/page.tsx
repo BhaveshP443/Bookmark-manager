@@ -1,5 +1,6 @@
 "use client";
 
+// createclient
 import { createClient } from "@/lib/supabase/client";
 
 export default function Home() {
