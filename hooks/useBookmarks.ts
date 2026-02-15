@@ -28,15 +28,12 @@ export function useBookmarks(userId: string) {
       }
 
       if (data) {
-        console.log("Initial fetch:", data.length);
         setBookmarks(data);
       }
     };
 
-    // Initial load
     fetchBookmarks();
 
-    // Realtime subscription
     channel = supabase
       .channel(`bookmarks-${userId}`)
       .on(
@@ -48,35 +45,30 @@ export function useBookmarks(userId: string) {
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
+          const newRow = payload.new as Bookmark | undefined;
+          const oldRow = payload.old as Bookmark | undefined;
+
           console.log("Realtime event:", payload.eventType);
-          console.log("Payload user_id:", payload.new?.user_id);
-          console.log("Payload old user_id:", payload.old?.user_id);
+          console.log("Payload user_id:", newRow?.user_id);
           console.log("Current userId:", userId);
 
-          if (payload.eventType === "INSERT") {
+          if (payload.eventType === "INSERT" && newRow) {
             setBookmarks((prev) => {
-              const exists = prev.some(
-                (b) => b.id === (payload.new as Bookmark).id
-              );
-              if (exists) return prev;
-              return [payload.new as Bookmark, ...prev];
+              if (prev.some((b) => b.id === newRow.id)) return prev;
+              return [newRow, ...prev];
             });
           }
 
-          if (payload.eventType === "DELETE") {
+          if (payload.eventType === "DELETE" && oldRow) {
             setBookmarks((prev) =>
-              prev.filter(
-                (b) => b.id !== (payload.old as Bookmark).id
-              )
+              prev.filter((b) => b.id !== oldRow.id)
             );
           }
 
-          if (payload.eventType === "UPDATE") {
+          if (payload.eventType === "UPDATE" && newRow) {
             setBookmarks((prev) =>
               prev.map((b) =>
-                b.id === (payload.new as Bookmark).id
-                  ? (payload.new as Bookmark)
-                  : b
+                b.id === newRow.id ? newRow : b
               )
             );
           }
@@ -85,13 +77,9 @@ export function useBookmarks(userId: string) {
       .subscribe((status) => {
         console.log("Realtime status:", status);
 
-        if (status === "SUBSCRIBED") {
-          setIsSubscribed(true);
-        }
-
-        if (status === "CLOSED" || status === "TIMED_OUT") {
+        if (status === "SUBSCRIBED") setIsSubscribed(true);
+        if (status === "CLOSED" || status === "TIMED_OUT")
           setIsSubscribed(false);
-        }
       });
 
     return () => {
