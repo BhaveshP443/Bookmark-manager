@@ -102,7 +102,7 @@ Realtime updates are implemented using Supabase `postgres_changes`:
 filter: `user_id=eq.${userId}`
 ```
 
-To ensure proper DELETE and INSERT payload delivery in production, replica identity was set to FULL:
+To ensure proper DELETE, INSERT AND UNDO DELETE payload delivery in production, replica identity was set to FULL:
 
 ```sql
 ALTER TABLE bookmarks REPLICA IDENTITY FULL;
