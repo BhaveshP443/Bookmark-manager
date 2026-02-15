@@ -6,9 +6,7 @@ import { Bookmark } from "@/types/database";
 
 export function useBookmarks(userId: string) {
   const supabase = useMemo(() => createClient(), []);
-
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
-  const [isSubscribed, setIsSubscribed] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -25,10 +23,8 @@ export function useBookmarks(userId: string) {
       if (data) setBookmarks(data);
     };
 
-    // Initial fetch
     fetchBookmarks();
 
-    // Realtime subscription
     channel = supabase
       .channel(`bookmarks-${userId}`)
       .on(
@@ -40,7 +36,7 @@ export function useBookmarks(userId: string) {
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          console.log("Realtime event:", payload);
+          console.log("Realtime payload:", payload);
 
           if (payload.eventType === "INSERT") {
             setBookmarks((prev) => [
@@ -61,12 +57,12 @@ export function useBookmarks(userId: string) {
       .subscribe((status) => {
         console.log("Realtime status:", status);
 
-        if (status === "SUBSCRIBED") {
-          setIsSubscribed(true);
+        if (status === "CHANNEL_ERROR") {
+          console.error("Realtime channel error");
         }
 
-        if (status === "CLOSED" || status === "TIMED_OUT") {
-          setIsSubscribed(false);
+        if (status === "TIMED_OUT") {
+          console.warn("Realtime timed out");
         }
       });
 
@@ -77,33 +73,26 @@ export function useBookmarks(userId: string) {
     };
   }, [userId, supabase]);
 
- const addBookmark = async (
-  title: string,
-  url: string
-): Promise<void> => {
-  const { data } = await supabase
-    .from("bookmarks")
-    .insert([
+  const addBookmark = async (title: string, url: string) => {
+    const { error } = await supabase.from("bookmarks").insert([
       {
         title,
         url,
         user_id: userId,
       },
-    ])
-    .select()
-    .single();
+    ]);
 
-  if (data) {
-    setBookmarks((prev) => [data as Bookmark, ...prev]);
-  }
-};
-
-
-  const deleteBookmark = async (
-    id: string
-  ): Promise<void> => {
-    await supabase.from("bookmarks").delete().eq("id", id);
+    if (error) console.error(error);
   };
 
-  return { bookmarks, addBookmark, deleteBookmark, isSubscribed };
+  const deleteBookmark = async (id: string) => {
+    const { error } = await supabase
+      .from("bookmarks")
+      .delete()
+      .eq("id", id);
+
+    if (error) console.error(error);
+  };
+
+  return { bookmarks, addBookmark, deleteBookmark };
 }
