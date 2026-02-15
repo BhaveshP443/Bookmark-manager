@@ -1,95 +1,97 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Bookmark } from "@/types/database";
 
 export function useBookmarks(userId: string) {
   const supabase = useMemo(() => createClient(), []);
+
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  /**
-   * Initial fetch (only once per user)
-   */
-  const fetchBookmarks = useCallback(async () => {
-    if (!userId) return;
-
-    const { data } = await supabase
-      .from("bookmarks")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false });
-
-    if (data) setBookmarks(data);
-    setIsLoading(false);
-  }, [supabase, userId]);
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
 
-    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let channel: any;
 
+    const fetchBookmarks = async () => {
+      const { data, error } = await supabase
+        .from("bookmarks")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Initial fetch error:", error);
+        return;
+      }
+
+      if (data) {
+        console.log("Initial fetch:", data.length);
+        setBookmarks(data);
+      }
+    };
+
+    // Initial load
     fetchBookmarks();
 
+    // Realtime subscription
     channel = supabase
       .channel(`bookmarks-${userId}`)
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "bookmarks",
-          // filter: `user_id=eq.${userId}`,
-          filter: undefined,
-
+          filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          const newBookmark = payload.new as Bookmark;
+          console.log("Realtime event:", payload.eventType);
+          console.log("Payload user_id:", payload.new?.user_id);
+          console.log("Payload old user_id:", payload.old?.user_id);
+          console.log("Current userId:", userId);
 
-          setBookmarks((prev) => {
-            // Prevent duplicates
-            if (prev.find((b) => b.id === newBookmark.id)) {
-              return prev;
-            }
-            return [newBookmark, ...prev];
-          });
+          if (payload.eventType === "INSERT") {
+            setBookmarks((prev) => {
+              const exists = prev.some(
+                (b) => b.id === (payload.new as Bookmark).id
+              );
+              if (exists) return prev;
+              return [payload.new as Bookmark, ...prev];
+            });
+          }
+
+          if (payload.eventType === "DELETE") {
+            setBookmarks((prev) =>
+              prev.filter(
+                (b) => b.id !== (payload.old as Bookmark).id
+              )
+            );
+          }
+
+          if (payload.eventType === "UPDATE") {
+            setBookmarks((prev) =>
+              prev.map((b) =>
+                b.id === (payload.new as Bookmark).id
+                  ? (payload.new as Bookmark)
+                  : b
+              )
+            );
+          }
         }
       )
-     .on(
-  "postgres_changes",
-  {
-    event: "*",
-    schema: "public",
-    table: "bookmarks",
-    filter: `user_id=eq.${userId}`,
-  },
-  (payload) => {
-    console.log("Realtime event:", payload.eventType);
-
-    console.log("Payload user_id:", payload.new?.user_id);
-    console.log("Payload old user_id:", payload.old?.user_id);
-    console.log("Current userId:", userId);
-
-    if (payload.eventType === "INSERT") {
-      setBookmarks((prev) => [
-        payload.new as Bookmark,
-        ...prev,
-      ]);
-    }
-
-    if (payload.eventType === "DELETE") {
-      setBookmarks((prev) =>
-        prev.filter(
-          (b) => b.id !== (payload.old as Bookmark).id
-        )
-      );
-    }
-  }
-)
-
       .subscribe((status) => {
         console.log("Realtime status:", status);
+
+        if (status === "SUBSCRIBED") {
+          setIsSubscribed(true);
+        }
+
+        if (status === "CLOSED" || status === "TIMED_OUT") {
+          setIsSubscribed(false);
+        }
       });
 
     return () => {
@@ -97,57 +99,42 @@ export function useBookmarks(userId: string) {
         supabase.removeChannel(channel);
       }
     };
-  }, [userId, supabase, fetchBookmarks]);
+  }, [userId, supabase]);
 
-  /**
-   * Add bookmark (Optimistic UI)
-   */
   const addBookmark = async (
     title: string,
     url: string
   ): Promise<void> => {
-    const { data, error } = await supabase
-      .from("bookmarks")
-      .insert({
+    const { error } = await supabase.from("bookmarks").insert([
+      {
         title,
         url,
         user_id: userId,
-      })
-      .select()
-      .single();
+      },
+    ]);
 
-    if (error) return;
-
-    if (data) {
-      // Optimistic update (instant UI)
-      setBookmarks((prev) => {
-        if (prev.find((b) => b.id === data.id)) return prev;
-        return [data as Bookmark, ...prev];
-      });
+    if (error) {
+      console.error("Insert error:", error);
     }
   };
 
-  /**
-   * Delete bookmark (Optimistic UI)
-   */
-  const deleteBookmark = async (id: string): Promise<void> => {
+  const deleteBookmark = async (
+    id: string
+  ): Promise<void> => {
     const { error } = await supabase
       .from("bookmarks")
       .delete()
       .eq("id", id);
 
-    if (error) return;
-
-    // Instant UI update
-    setBookmarks((prev) =>
-      prev.filter((b) => b.id !== id)
-    );
+    if (error) {
+      console.error("Delete error:", error);
+    }
   };
 
   return {
     bookmarks,
     addBookmark,
     deleteBookmark,
-    isLoading,
+    isSubscribed,
   };
 }
