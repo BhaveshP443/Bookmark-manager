@@ -12,15 +12,13 @@ export async function createClient() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options);
-            });
-          } catch {
-            // Prevent crash in Server Components
-          }
+        setAll() {
+          // Do nothing in Server Components
         },
+      },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
       },
     }
   );
