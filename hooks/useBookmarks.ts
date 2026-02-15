@@ -1,31 +1,42 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Bookmark } from "@/types/database";
 
 export function useBookmarks(userId: string) {
   const supabase = useMemo(() => createClient(), []);
+
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // 🔹 Centralized fetch function (stable reference)
+  const fetchBookmarks = useCallback(async () => {
+    if (!userId) return;
+
+    const { data, error } = await supabase
+      .from("bookmarks")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      setBookmarks(data);
+    }
+
+    setLoading(false);
+  }, [userId, supabase]);
 
   useEffect(() => {
     if (!userId) return;
 
     let channel: any;
 
-    const fetchBookmarks = async () => {
-      const { data } = await supabase
-        .from("bookmarks")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
-
-      if (data) setBookmarks(data);
-    };
-
+    // Initial load
     fetchBookmarks();
 
+    // Realtime subscription
     channel = supabase
       .channel(`bookmarks-${userId}`)
       .on(
@@ -36,29 +47,19 @@ export function useBookmarks(userId: string) {
           table: "bookmarks",
           filter: `user_id=eq.${userId}`,
         },
-        (payload) => {
-          if (payload.eventType === "INSERT") {
-            setBookmarks((prev) => {
-              const exists = prev.find(
-                (b) => b.id === payload.new.id
-              );
-              if (exists) return prev;
-              return [payload.new as Bookmark, ...prev];
-            });
-          }
-
-          if (payload.eventType === "DELETE") {
-            setBookmarks((prev) =>
-              prev.filter(
-                (b) => b.id !== payload.old.id
-              )
-            );
-          }
+        () => {
+          // 🔥 Always refetch to ensure consistency across devices
+          fetchBookmarks();
         }
       )
       .subscribe((status) => {
-        console.log("Realtime status:", status);
-        setIsSubscribed(status === "SUBSCRIBED");
+        if (status === "SUBSCRIBED") {
+          setIsSubscribed(true);
+        }
+
+        if (status === "CLOSED" || status === "TIMED_OUT") {
+          setIsSubscribed(false);
+        }
       });
 
     return () => {
@@ -66,49 +67,45 @@ export function useBookmarks(userId: string) {
         supabase.removeChannel(channel);
       }
     };
-  }, [userId, supabase]);
+  }, [userId, supabase, fetchBookmarks]);
 
-  // ✅ Optimistic update
+  // 🔹 Add bookmark (no optimistic update)
   const addBookmark = async (
     title: string,
     url: string
   ): Promise<void> => {
-    const { data, error } = await supabase
-      .from("bookmarks")
-      .insert([
-        {
-          title,
-          url,
-          user_id: userId,
-        },
-      ])
-      .select()
-      .single();
+    const { error } = await supabase.from("bookmarks").insert([
+      {
+        title,
+        url,
+        user_id: userId,
+      },
+    ]);
 
     if (error) {
-      console.error(error);
-      return;
-    }
-
-    if (data) {
-      setBookmarks((prev) => {
-        const exists = prev.find((b) => b.id === data.id);
-        if (exists) return prev;
-        return [data as Bookmark, ...prev];
-      });
+      console.error("Insert failed:", error);
     }
   };
 
+  // 🔹 Delete bookmark
   const deleteBookmark = async (
     id: string
   ): Promise<void> => {
-    await supabase.from("bookmarks").delete().eq("id", id);
+    const { error } = await supabase
+      .from("bookmarks")
+      .delete()
+      .eq("id", id);
 
-    // Optimistic delete
-    setBookmarks((prev) =>
-      prev.filter((b) => b.id !== id)
-    );
+    if (error) {
+      console.error("Delete failed:", error);
+    }
   };
 
-  return { bookmarks, addBookmark, deleteBookmark, isSubscribed };
+  return {
+    bookmarks,
+    addBookmark,
+    deleteBookmark,
+    isSubscribed,
+    loading,
+  };
 }
